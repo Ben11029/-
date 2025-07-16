@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>佛教讲座整理与翻译</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        .container {
+            max-width: 1200px; /* Increased max-width for three columns */
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6; /* Blue spinner */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 0.5rem; /* Rounded corners for table */
+            overflow: hidden; /* Ensures rounded corners are applied */
+        }
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb; /* Light gray border */
+            vertical-align: top; /* Align content to top for multi-line text */
+        }
+        th {
+            background-color: #e0f2fe; /* Light blue header */
+            font-weight: 600;
+            color: #1e40af; /* Darker blue text */
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb; /* Slightly darker background for even rows */
+        }
+        tr:hover {
+            background-color: #eff6ff; /* Lightest blue on hover */
+        }
+        td[contenteditable="true"]:focus {
+            outline: 2px solid #3b82f6; /* Blue outline on focus */
+            outline-offset: -1px;
+        }
+        /* <!-- RED_MARK_START --> */
+        .highlight-red {
+            color: red;
+        }
+        /* <!-- RED_MARK_END --> */
+        /* <!-- NEW_MARK_START --> */
+        .highlight-diff {
+            color: red;
+            font-weight: bold; /* Make diffs stand out more */
+        }
+        /* <!-- NEW_MARK_END --> */
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8">
+    <div class="container mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">佛教讲座整理与翻译</h1>
+
+        <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 text-blue-800">
+            <p class="mb-2"><strong>使用说明：</strong></p>
+            <ol class="list-decimal list-inside space-y-1">
+                <li><span class="highlight-red">网页加载后将自带一个可编辑表格。</span>你可以在表格的“原文”列直接编辑内容。</li>
+                <li>编辑完成后，“修改文”和“英文”列将自动更新 Gemini AI 的处理结果。</li>
+                <li>点击“添加新行”按钮可以在表格末尾增加空白行。</li>
+                <li><span class="highlight-red">点击“选择Excel文件”按钮上传你的 `.xlsx` 文件，第一列的讲座原文将自动加载并处理，替换当前表格内容。</span></li>
+                <!-- NEW_MARK_START -->
+                <li>在“修改文”和“英文”列中，Gemini AI 识别并修改的**佛教术语**将显示为<span class="highlight-diff">红色加粗</span>。</li>
+                <li>“修改文”和“英文”列的内容将自动按**句**分段显示。</li>
+                <!-- NEW_MARK_END -->
+            </ol>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls" class="hidden" onchange="handleFileSelect(event)">
+            <label for="excelFileInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                选择Excel文件
+            </label>
+            <button id="addNewRowButton" onclick="addNewRow()" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                添加新行
+            </button>
+        </div>
+
+        <div id="statusMessage" class="text-center text-sm font-medium text-gray-600 mb-4">
+            <!-- RED_MARK_START -->
+            请在“原文”列输入内容，或选择一个Excel文件...
+            <!-- RED_MARK_END -->
+        </div>
+
+        <div id="loadingIndicator" class="hidden flex items-center justify-center gap-2 text-blue-600 font-semibold mb-4">
+            <div class="loading-spinner"></div>
+            <span>正在处理，请稍候...</span>
+        </div>
+
+        <div id="resultsContainer" class="mt-8 overflow-x-auto rounded-xl shadow-md">
+            <!-- Processed results will be displayed here -->
+            <table id="resultsTable" class="min-w-full bg-white">
+                <thead>
+                    <tr>
+                        <th class="rounded-tl-lg">原文 (Original Text)</th>
+                        <th>修改文 (Corrected Text)</th>
+                        <th class="rounded-tr-lg">英文 (English Translation)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data rows will be inserted here by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <div id="errorMessage" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            <!-- Error messages will be displayed here -->
+        </div>
+    </div>
+
+    <!-- SheetJS CDN for reading Excel files -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+
+    <script>
+        // 全局变量
+        let excelData = []; // 存储从Excel读取或用户输入的原始数据（仅第一列输入）
+        let processedResults = []; // 存储所有行的原始数据、纠正后的中文和英文翻译，用于显示
+        const DELAY_BETWEEN_REQUESTS = 2000; // 2秒延迟，防止API限速
+        const DEBOUNCE_DELAY = 500; // 防抖延迟，单位毫秒
+        // <!-- RED_MARK_START -->
+        const INITIAL_ROWS = 5; // 页面加载时默认显示的行数
+        // <!-- RED_MARK_END -->
+
+        // UI 元素引用
+        const excelFileInput = document.getElementById('excelFileInput');
+        const addNewRowButton = document.getElementById('addNewRowButton');
+        const statusMessage = document.getElementById('statusMessage');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultsTableBody = document.querySelector('#resultsTable tbody');
+        const errorMessageDiv = document.getElementById('errorMessage');
+
+        // 防抖函数
+        let debounceTimer;
+        function debounce(func, delay) {
+            return function(...args) {
+                const context = this;
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
+
+        /**
+         * <!-- NEW_MARK_START -->
+         * 将Gemini返回的带有特殊标记的文本转换为HTML，用于高亮显示。
+         * Gemini会用 [[术语]] 标记变化的佛教术语。
+         * @param {string} textWithMarkers - 包含特殊标记的文本
+         * @returns {string} - 带有高亮HTML标签的文本
+         */
+        function applyLLMHighlights(textWithMarkers) {
+            if (!textWithMarkers) {
+                return '';
+            }
+            // 使用正则表达式匹配 [[...]] 并替换为 <span class="highlight-diff">...</span>
+            return textWithMarkers.replace(/\[\[(.*?)\]\]/g, '<span class="highlight-diff">$1</span>');
+        }
+        /* <!-- NEW_MARK_END --> */
+
+        /**
+         * 处理文件选择事件
+         * @param {Event} event - 文件选择事件对象
+         */
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                statusMessage.textContent = '请选择一个Excel文件...';
+                return;
+            }
+
+            statusMessage.textContent = `已选择文件: ${file.name}，正在加载...`;
+            errorMessageDiv.classList.add('hidden'); // Hide error message
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    let loadedExcelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    // Filter out empty rows, keep only rows with data in the first column
+                    loadedExcelData = loadedExcelData.filter(row => row.length > 0 && row[0] !== null && String(row[0]).trim() !== '');
+
+                    if (loadedExcelData.length === 0) {
+                        displayError('Excel文件第一列没有找到有效数据。');
+                        statusMessage.textContent = '请在“原文”列输入内容，或选择一个Excel文件...';
+                        return;
+                    }
+                    
+                    // <!-- RED_MARK_START -->
+                    // Replace current data with loaded data
+                    excelData = loadedExcelData;
+                    // Initialize processedResults, with empty second and third columns
+                    processedResults = excelData.map(row => [String(row[0]).trim(), '', '']);
+                    // <!-- RED_MARK_END -->
+
+
+                    statusMessage.textContent = `文件 "${file.name}" 读取成功，共 ${excelData.length} 行数据。正在初始化处理...`;
+                    await processAllDataInitially(); // Initial load and process all data
+                    statusMessage.textContent = `文件 "${file.name}" 加载并处理完成。`;
+
+                } catch (error) {
+                    displayError(`读取或解析Excel文件时发生错误: ${error.message}`);
+                    statusMessage.textContent = '请在“原文”列输入内容，或选择一个Excel文件...';
+                }
+            };
+            reader.onerror = function(e) {
+                displayError(`文件读取失败: ${e.target.error}`);
+                statusMessage.textContent = '请在“原文”列输入内容，或选择一个Excel文件...';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        /**
+         * 显示错误信息
+         * @param {string} message - 要显示的错误信息
+         */
+        function displayError(message) {
+            errorMessageDiv.textContent = `错误: ${message}`;
+            errorMessageDiv.classList.remove('hidden');
+            loadingIndicator.classList.add('hidden');
+        }
+
+        /**
+         * 调用Google Gemini API
+         * @param {string} prompt - 发送给Gemini的指令
+         * @returns {Promise<{corrected_zh: string[], en_translation: string[]}>} - Gemini模型的响应对象，包含字符串数组
+         */
+        async function callGeminiAPI(prompt) {
+            const chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+            const payload = {
+                contents: chatHistory,
+                generationConfig: {
+                    responseMimeType: "application/json", // Request JSON response
+                    responseSchema: {
+                        type: "OBJECT", // Expect an object
+                        properties: {
+                            // <!-- RED_MARK_START -->
+                            "corrected_zh": { "type": "ARRAY", "items": { "type": "STRING" } }, // Corrected Chinese, now an array of strings (sentences)
+                            "en_translation": { "type": "ARRAY", "items": { "type": "STRING" } } // English translation, now an array of strings (sentences)
+                            // <!-- RED_MARK_END -->
+                        },
+                        "propertyOrdering": ["corrected_zh", "en_translation"] // Maintain order
+                    }
+                }
+            };
+            const apiKey = ""; // Canvas will provide this API key at runtime
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API 请求失败: ${response.status} - ${errorData.error ? errorData.error.message : '未知错误'}`);
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    try {
+                        const parsedJson = JSON.parse(jsonString);
+                        // Validate that the return is indeed an object containing expected fields, and field values are arrays of strings
+                        if (typeof parsedJson === 'object' && parsedJson !== null &&
+                            Array.isArray(parsedJson.corrected_zh) && parsedJson.corrected_zh.every(item => typeof item === 'string') &&
+                            Array.isArray(parsedJson.en_translation) && parsedJson.en_translation.every(item => typeof item === 'string')) {
+                            return parsedJson; // Return the parsed object
+                        } else {
+                            throw new Error("Gemini API 返回的JSON结构不符合预期 (不是包含字符串数组的 corrected_zh 和 en_translation 对象)。");
+                        }
+                    } catch (parseError) {
+                        throw new Error(`解析Gemini API返回的JSON失败: ${parseError.message}. 原始响应: ${jsonString}`);
+                    }
+                } else {
+                    throw new Error("Gemini API 返回的响应结构不符合预期或内容为空。");
+                }
+            } catch (error) {
+                console.error("调用Gemini API时发生错误:", error);
+                throw error; // Re-throw error for higher-level functions to catch
+            }
+        }
+
+        /**
+         * 初始加载时处理所有数据 (或上传文件后处理)
+         */
+        async function processAllDataInitially() {
+            if (excelData.length === 0) {
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            statusMessage.textContent = `正在处理数据... (0/${excelData.length} 行)`;
+
+            for (let i = 0; i < excelData.length; i++) {
+                const singleData = String(excelData[i][0]).trim();
+                
+                if (singleData === '') {
+                    processedResults[i][1] = ''; // Clear second column
+                    processedResults[i][2] = ''; // Clear third column
+                    statusMessage.textContent = `正在处理数据... (${i + 1}/${excelData.length} 行)`;
+                    displayResults(processedResults);
+                    await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS / 2));
+                    continue;
+                }
+
+                // <!-- RED_MARK_START -->
+                // Prompt for single-line processing, explicitly requesting marking of changed Buddhist terms, and returning segmented arrays
+                const prompt = `以下是一段佛教讲座的语音转录，其中可能包含错别字和谐音字。请你：
+1. 纠正所有错别字和谐音字，使文本流畅、准确。
+2. 将纠正后的中文文本按**句**分段。每个句子作为一个独立的字符串。
+3. 将纠正并分段后的中文文本翻译成英文。每个英文句子作为一个独立的字符串，**对原文中对应的佛教术语使用双层方括号 \`[[]]\` 进行标记**。
+4. 在 'corrected_zh' 字段的每个句子中，对**原文中发生变化的佛教术语**使用双层方括号 \`[[]]\` 进行标记。例如：\`[[菩提]]\`。
+
+请以JSON对象的形式返回结果，包含 'corrected_zh'（纠正并分段后的中文句子数组）和 'en_translation'（英文翻译句子数组）两个字段。
+例如：
+{"corrected_zh": ["这是第一个句子。", "这是[[第二个]]句子，其中包含[[术语]]。"], "en_translation": ["This is the first sentence.", "This is the [[second]] sentence, containing a [[term]]."]}
+原文：
+${singleData}`;
+                // <!-- RED_MARK_END -->
+
+                try {
+                    const geminiOutput = await callGeminiAPI(prompt); // Expect an object
+                    // <!-- RED_MARK_START -->
+                    // Apply applyLLMHighlights function to corrected Chinese text, and join sentences with <br><br>
+                    processedResults[i][1] = applyLLMHighlights(geminiOutput.corrected_zh.join('<br><br>'));
+                    // Apply applyLLMHighlights to English sentences as well
+                    processedResults[i][2] = applyLLMHighlights(geminiOutput.en_translation.join('<br><br>'));
+                    // <!-- RED_MARK_END -->
+                } catch (error) {
+                    console.error(`处理行 ${i + 1} 时发生错误:`, error);
+                    processedResults[i][1] = `错误: ${error.message}`;
+                    processedResults[i][2] = `错误: ${error.message}`;
+                }
+
+                displayResults(processedResults);
+                statusMessage.textContent = `正在处理数据... (${i + 1}/${excelData.length} 行)`;
+
+                if (i < excelData.length - 1) { // Delay after each row except the last one
+                    await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS));
+                }
+            }
+
+            loadingIndicator.classList.add('hidden');
+            statusMessage.textContent = `所有 ${excelData.length} 行数据处理完成！`;
+        }
+
+        /**
+         * <!-- RED_MARK_START -->
+         * 处理单元格失去焦点事件 (blur)
+         * @param {Event} event - 失去焦点事件对象
+         * @param {number} rowIndex - 被编辑的行索引
+         */
+        function handleCellBlur(event, rowIndex) {
+            const newValue = event.target.textContent;
+            // Ensure excelData array length is sufficient for the current row
+            while (excelData.length <= rowIndex) {
+                excelData.push(['']);
+                processedResults.push(['', '', '']);
+            }
+            excelData[rowIndex][0] = newValue; // Update original input in excelData
+            processedResults[rowIndex][0] = newValue; // Update original input in display data
+
+            // Get references to the specific cells to update their status
+            const rowElement = resultsTableBody.children[rowIndex];
+            if (!rowElement) return; // Should not happen if rowIndex is valid
+
+            // If new value is empty, clear second and third columns, do not send API request
+            if (newValue.trim() === '') {
+                processedResults[rowIndex][1] = '';
+                processedResults[rowIndex][2] = '';
+                rowElement.cells[1].innerHTML = '';
+                rowElement.cells[2].innerHTML = '';
+                return;
+            }
+
+            // Immediately display "Processing..." status
+            rowElement.cells[1].innerHTML = '处理中...';
+            rowElement.cells[2].innerHTML = '处理中...';
+
+            // Use debounce to call single row processing function
+            debouncedProcessSingleRow(rowIndex);
+        }
+        // <!-- RED_MARK_END -->
+
+        /**
+         * 防抖处理后的单行处理函数
+         * @param {number} rowIndex - 被编辑的行索引
+         */
+        const debouncedProcessSingleRow = debounce(async (rowIndex) => {
+            const singleData = String(excelData[rowIndex][0]).trim();
+
+            // <!-- RED_MARK_START -->
+            // Get references to the specific cells to update their status
+            const rowElement = resultsTableBody.children[rowIndex];
+            if (!rowElement) return; // Should not happen if rowIndex is valid
+            // <!-- RED_MARK_END -->
+
+            if (singleData === '') {
+                processedResults[rowIndex][1] = ''; // Ensure empty input clears output
+                processedResults[rowIndex][2] = '';
+                // <!-- RED_MARK_START -->
+                // Directly update the display for the current row
+                rowElement.cells[1].innerHTML = '';
+                rowElement.cells[2].innerHTML = '';
+                // <!-- RED_MARK_END -->
+                return;
+            }
+
+            // <!-- RED_MARK_START -->
+            // Prompt for single-line processing, explicitly requesting marking of changed Buddhist terms, and returning segmented arrays
+            const prompt = `以下是一段佛教讲座的语音转录，其中可能包含错别字和谐音字。请你：
+1. 纠正所有错别字和谐音字，使文本流畅、准确。
+2. 将纠正后的中文文本按**句**分段。每个句子作为一个独立的字符串。
+3. 将纠正并分段后的中文文本翻译成英文。每个英文句子作为一个独立的字符串，**对原文中对应的佛教术语使用双层方括号 \`[[]]\` 进行标记**。
+4. 在 'corrected_zh' 字段的每个句子中，对**原文中发生变化的佛教术语**使用双层方括号 \`[[]]\` 进行标记。例如：\`[[菩提]]\`。
+
+请以JSON对象的形式返回结果，包含 'corrected_zh'（纠正并分段后的中文句子数组）和 'en_translation'（英文翻译句子数组）两个字段。
+例如：
+{"corrected_zh": ["这是第一个句子。", "这是[[第二个]]句子，其中包含[[术语]]。"], "en_translation": ["This is the first sentence.", "This is the [[second]] sentence, containing a [[term]]."]}
+原文：
+${singleData}`;
+            // <!-- RED_MARK_END -->
+
+            try {
+                const geminiOutput = await callGeminiAPI(prompt); // Expect an object
+                // <!-- RED_MARK_START -->
+                // Apply applyLLMHighlights function to corrected Chinese text, and join sentences with <br><br>
+                processedResults[rowIndex][1] = applyLLMHighlights(geminiOutput.corrected_zh.join('<br><br>'));
+                // Apply applyLLMHighlights to English sentences as well
+                processedResults[rowIndex][2] = applyLLMHighlights(geminiOutput.en_translation.join('<br><br>'));
+                // <!-- RED_MARK_END -->
+            } catch (error) {
+                console.error(`处理行 ${rowIndex + 1} 时发生错误:`, error);
+                processedResults[rowIndex][1] = `错误: ${error.message}`;
+                processedResults[rowIndex][2] = `错误: ${error.message}`;
+            }
+            // <!-- RED_MARK_START -->
+            // Directly update the display for the current row with final results
+            rowElement.cells[1].innerHTML = processedResults[rowIndex][1];
+            rowElement.cells[2].innerHTML = processedResults[rowIndex][2];
+            // <!-- RED_MARK_END -->
+        }, DEBOUNCE_DELAY);
+
+        /**
+         * 在表格中显示结果
+         * @param {Array<Array<string>>} data - 包含原始数据、纠正后的中文和英文翻译的二维数组
+         */
+        function displayResults(data) {
+            resultsTableBody.innerHTML = ''; // Clear existing content
+
+            if (data.length === 0) {
+                // <!-- RED_MARK_START -->
+                // If no data, still display an empty row for user input
+                addNewRow(); // Add a row to ensure the table always has editable rows
+                return;
+                // <!-- RED_MARK_END -->
+            }
+
+            data.forEach((rowData, index) => {
+                const row = resultsTableBody.insertRow();
+                row.dataset.rowIndex = index; // Set data attribute for row index
+
+                const originalCell = row.insertCell();
+                originalCell.contentEditable = "true"; // Make first column editable
+                originalCell.textContent = rowData[0] || '';
+                // <!-- RED_MARK_START -->
+                originalCell.addEventListener('blur', (event) => handleCellBlur(event, index)); // Listen for blur events instead of input
+                // <!-- RED_MARK_END -->
+
+                const correctedZhCell = row.insertCell();
+                // <!-- NEW_MARK_START -->
+                // Use innerHTML to render text with highlights and segmentation
+                correctedZhCell.innerHTML = rowData[1] || '';
+                // <!-- NEW_MARK_END -->
+
+                const englishCell = row.insertCell();
+                // <!-- NEW_MARK_START -->
+                // Use innerHTML to render segmented English text
+                englishCell.innerHTML = rowData[2] || '';
+                // <!-- NEW_MARK_END -->
+            });
+        }
+
+        /**
+         * 添加新行到表格
+         */
+        function addNewRow() {
+            const newRowData = ['', '', '']; // New row initialized as empty (Original, Corrected, English)
+            excelData.push([newRowData[0]]); // Add to excelData (only store original)
+            processedResults.push(newRowData); // Add to processedResults
+
+            displayResults(processedResults); // Re-render table to display new row
+            statusMessage.textContent = `已添加新行。请在“原文”列输入内容。`;
+
+            // Scroll to the newly added row
+            const lastRow = resultsTableBody.lastElementChild;
+            if (lastRow) {
+                lastRow.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+        }
+
+        // Initialize table on page load, display a few empty editable rows by default
+        document.addEventListener('DOMContentLoaded', () => {
+            // <!-- RED_MARK_START -->
+            // Initially populate with some empty rows
+            for (let i = 0; i < INITIAL_ROWS; i++) {
+                excelData.push(['']);
+                processedResults.push(['', '', '']);
+            }
+            displayResults(processedResults);
+            statusMessage.textContent = '请在“原文”列输入内容，或选择一个Excel文件...';
+            // <!-- RED_MARK_END -->
+        });
+    </script>
+</body>
+</html>
