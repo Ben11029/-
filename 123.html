@@ -70,18 +70,20 @@
 </head>
 <body class="p-4 sm:p-6 md:p-8">
     <div class="container mx-auto bg-white p-6 rounded-xl shadow-lg">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">佛教讲座整理与翻译</h1>
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">佛教文本整理与翻译</h1>
 
         <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 text-blue-800">
             <p class="mb-2"><strong>使用说明：</strong></p>
             <ol class="list-decimal list-inside space-y-1">
-                <li><span class="highlight-red">网页加载后将自带一个可编辑表格。</span>你可以在表格的“原文”列直接编辑内容。</li>
-                <li>编辑完成后，“修改文”和“英文”列将自动更新 Gemini AI 的处理结果。</li>
-                <li>点击“添加新行”按钮可以在表格末尾增加空白行。</li>
+                <li><span class="highlight-red">网页加载后将自带一个可编辑表格。</span>你可以在表格的“原文”列直接编辑内容，或者通过语音转录输入。</li>
+                <li>编辑完成后，并退出编辑状态，“修改文”和“英文”列将自动更新 Gemini AI 的处理结果。</li>
+                <!-- RED_MARK_START -->
+                <!-- <li>点击“添加新行”按钮可以在表格末尾增加空白行。</li> -->
+                <!-- RED_MARK_END -->
                 <li><span class="highlight-red">点击“选择Excel文件”按钮上传你的 `.xlsx` 文件，第一列的讲座原文将自动加载并处理，替换当前表格内容。</span></li>
                 <!-- NEW_MARK_START -->
-                <li>在“修改文”和“英文”列中，Gemini AI 识别并修改的**佛教术语**将显示为<span class="highlight-diff">红色加粗</span>。</li>
-                <li>“修改文”和“英文”列的内容将自动按**句**分段显示。</li>
+                <li>在“修改文”和“英文”列中，Gemini AI 识别并修改的佛教术语将显示为<span class="highlight-diff">红色加粗</span>。</li>
+                <li>“修改文”和“英文”列的内容将自动按【句】分段显示。</li>
                 <!-- NEW_MARK_END -->
             </ol>
         </div>
@@ -91,9 +93,11 @@
             <label for="excelFileInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
                 选择Excel文件
             </label>
-            <button id="addNewRowButton" onclick="addNewRow()" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+            <!-- RED_MARK_START -->
+            <!-- <button id="addNewRowButton" onclick="addNewRow()" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
                 添加新行
-            </button>
+            </button> -->
+            <!-- RED_MARK_END -->
         </div>
 
         <div id="statusMessage" class="text-center text-sm font-medium text-gray-600 mb-4">
@@ -139,11 +143,16 @@
         const DEBOUNCE_DELAY = 500; // 防抖延迟，单位毫秒
         // <!-- RED_MARK_START -->
         const INITIAL_ROWS = 5; // 页面加载时默认显示的行数
+        const SCROLL_LOAD_BATCH_SIZE = 5; // 每次滚动到底部时加载的行数
+        const SCROLL_THRESHOLD = 200; // 距离底部多少像素时触发加载
+        let isLoadingMoreRows = false; // 防止重复加载的标志
         // <!-- RED_MARK_END -->
 
         // UI 元素引用
         const excelFileInput = document.getElementById('excelFileInput');
-        const addNewRowButton = document.getElementById('addNewRowButton');
+        // <!-- RED_MARK_START -->
+        // const addNewRowButton = document.getElementById('addNewRowButton'); // 移除按钮引用
+        // <!-- RED_MARK_END -->
         const statusMessage = document.getElementById('statusMessage');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const resultsTableBody = document.querySelector('#resultsTable tbody');
@@ -212,6 +221,13 @@
                     excelData = loadedExcelData;
                     // Initialize processedResults, with empty second and third columns
                     processedResults = excelData.map(row => [String(row[0]).trim(), '', '']);
+
+                    // Clear existing rows from DOM before rendering new data
+                    resultsTableBody.innerHTML = '';
+                    // Append loaded data rows to the DOM
+                    processedResults.forEach((rowData, index) => {
+                        appendRowToDOM(rowData, index);
+                    });
                     // <!-- RED_MARK_END -->
 
 
@@ -326,7 +342,9 @@
                     processedResults[i][1] = ''; // Clear second column
                     processedResults[i][2] = ''; // Clear third column
                     statusMessage.textContent = `正在处理数据... (${i + 1}/${excelData.length} 行)`;
-                    displayResults(processedResults);
+                    // <!-- RED_MARK_START -->
+                    updateRowInDOM(i, processedResults[i]); // Update DOM for this row
+                    // <!-- RED_MARK_END -->
                     await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS / 2));
                     continue;
                 }
@@ -360,7 +378,9 @@ ${singleData}`;
                     processedResults[i][2] = `错误: ${error.message}`;
                 }
 
-                displayResults(processedResults);
+                // <!-- RED_MARK_START -->
+                updateRowInDOM(i, processedResults[i]); // Update DOM for this row
+                // <!-- RED_MARK_END -->
                 statusMessage.textContent = `正在处理数据... (${i + 1}/${excelData.length} 行)`;
 
                 if (i < excelData.length - 1) { // Delay after each row except the last one
@@ -384,6 +404,7 @@ ${singleData}`;
             while (excelData.length <= rowIndex) {
                 excelData.push(['']);
                 processedResults.push(['', '', '']);
+                appendRowToDOM(['', '', ''], excelData.length - 1); // Append new row to DOM if needed
             }
             excelData[rowIndex][0] = newValue; // Update original input in excelData
             processedResults[rowIndex][0] = newValue; // Update original input in display data
@@ -470,42 +491,50 @@ ${singleData}`;
         }, DEBOUNCE_DELAY);
 
         /**
-         * 在表格中显示结果
+         * <!-- RED_MARK_START -->
+         * 将单行数据添加到表格DOM中
+         * @param {Array<string>} rowData - 包含原始数据、纠正后的中文和英文翻译的数组
+         * @param {number} index - 行索引
+         */
+        function appendRowToDOM(rowData, index) {
+            const row = resultsTableBody.insertRow();
+            row.dataset.rowIndex = index; // Set data attribute for row index
+
+            const originalCell = row.insertCell();
+            originalCell.contentEditable = "true"; // Make first column editable
+            originalCell.textContent = rowData[0] || '';
+            originalCell.addEventListener('blur', (event) => handleCellBlur(event, index)); // Listen for blur events
+
+            const correctedZhCell = row.insertCell();
+            correctedZhCell.innerHTML = rowData[1] || '';
+
+            const englishCell = row.insertCell();
+            englishCell.innerHTML = rowData[2] || '';
+        }
+
+        /**
+         * Updates a specific row in the DOM.
+         * @param {number} rowIndex - The index of the row to update.
+         * @param {Array<string>} rowData - The new data for the row.
+         */
+        function updateRowInDOM(rowIndex, rowData) {
+            const rowElement = resultsTableBody.children[rowIndex];
+            if (rowElement) {
+                rowElement.cells[0].textContent = rowData[0] || ''; // Update original text
+                rowElement.cells[1].innerHTML = rowData[1] || ''; // Update corrected text (with highlights)
+                rowElement.cells[2].innerHTML = rowData[2] || ''; // Update English translation (with highlights)
+            }
+        }
+        // <!-- RED_MARK_END -->
+
+        /**
+         * 在表格中显示结果 (主要用于初始加载或文件上传后清空并重新渲染)
          * @param {Array<Array<string>>} data - 包含原始数据、纠正后的中文和英文翻译的二维数组
          */
         function displayResults(data) {
             resultsTableBody.innerHTML = ''; // Clear existing content
-
-            if (data.length === 0) {
-                // <!-- RED_MARK_START -->
-                // If no data, still display an empty row for user input
-                addNewRow(); // Add a row to ensure the table always has editable rows
-                return;
-                // <!-- RED_MARK_END -->
-            }
-
             data.forEach((rowData, index) => {
-                const row = resultsTableBody.insertRow();
-                row.dataset.rowIndex = index; // Set data attribute for row index
-
-                const originalCell = row.insertCell();
-                originalCell.contentEditable = "true"; // Make first column editable
-                originalCell.textContent = rowData[0] || '';
-                // <!-- RED_MARK_START -->
-                originalCell.addEventListener('blur', (event) => handleCellBlur(event, index)); // Listen for blur events instead of input
-                // <!-- RED_MARK_END -->
-
-                const correctedZhCell = row.insertCell();
-                // <!-- NEW_MARK_START -->
-                // Use innerHTML to render text with highlights and segmentation
-                correctedZhCell.innerHTML = rowData[1] || '';
-                // <!-- NEW_MARK_END -->
-
-                const englishCell = row.insertCell();
-                // <!-- NEW_MARK_START -->
-                // Use innerHTML to render segmented English text
-                englishCell.innerHTML = rowData[2] || '';
-                // <!-- NEW_MARK_END -->
+                appendRowToDOM(rowData, index);
             });
         }
 
@@ -513,11 +542,16 @@ ${singleData}`;
          * 添加新行到表格
          */
         function addNewRow() {
+            // <!-- RED_MARK_START -->
+            // Add a single new empty row
             const newRowData = ['', '', '']; // New row initialized as empty (Original, Corrected, English)
+            const newIndex = excelData.length;
             excelData.push([newRowData[0]]); // Add to excelData (only store original)
             processedResults.push(newRowData); // Add to processedResults
 
-            displayResults(processedResults); // Re-render table to display new row
+            appendRowToDOM(newRowData, newIndex); // Directly append to DOM
+            // <!-- RED_MARK_END -->
+
             statusMessage.textContent = `已添加新行。请在“原文”列输入内容。`;
 
             // Scroll to the newly added row
@@ -527,6 +561,32 @@ ${singleData}`;
             }
         }
 
+        // <!-- RED_MARK_START -->
+        /**
+         * 处理滚动事件，用于自动加载更多行
+         */
+        function handleScroll() {
+            // Check if scrolled to bottom
+            const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrolledToBottom = document.documentElement.scrollTop >= scrollableHeight - SCROLL_THRESHOLD;
+
+            if (scrolledToBottom && !isLoadingMoreRows) {
+                isLoadingMoreRows = true;
+                statusMessage.textContent = '正在加载更多行...';
+                // Add a batch of new rows
+                for (let i = 0; i < SCROLL_LOAD_BATCH_SIZE; i++) {
+                    const newRowData = ['', '', ''];
+                    const newIndex = excelData.length;
+                    excelData.push([newRowData[0]]);
+                    processedResults.push(newRowData);
+                    appendRowToDOM(newRowData, newIndex);
+                }
+                statusMessage.textContent = `已加载 ${SCROLL_LOAD_BATCH_SIZE} 行。`;
+                isLoadingMoreRows = false;
+            }
+        }
+        // <!-- RED_MARK_END -->
+
         // Initialize table on page load, display a few empty editable rows by default
         document.addEventListener('DOMContentLoaded', () => {
             // <!-- RED_MARK_START -->
@@ -534,9 +594,12 @@ ${singleData}`;
             for (let i = 0; i < INITIAL_ROWS; i++) {
                 excelData.push(['']);
                 processedResults.push(['', '', '']);
+                appendRowToDOM(processedResults[i], i); // Directly append to DOM
             }
-            displayResults(processedResults);
             statusMessage.textContent = '请在“原文”列输入内容，或选择一个Excel文件...';
+
+            // Add scroll event listener for infinite loading
+            window.addEventListener('scroll', handleScroll);
             // <!-- RED_MARK_END -->
         });
     </script>
