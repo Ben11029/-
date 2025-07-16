@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>佛教文本整理与翻译</title>
+    <title>佛教讲座整理与翻译</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Inter Font -->
@@ -77,11 +77,13 @@
             <ol class="list-decimal list-inside space-y-1">
                 <li><span class="highlight-red">网页加载后将自带一个可编辑表格。</span>你可以在表格的“原文”列直接编辑内容，或者通过语音转录输入。</li>
                 <li>编辑完成后，并退出编辑状态，“修改文”和“英文”列将自动更新 Gemini AI 的处理结果。</li>
-                <li><span class="highlight-red">网页加载后将自带一个可编辑表格。</span>你可以在表格的“原文”列直接编辑内容。</li>
+                <!-- RED_MARK_START -->
+                <!-- <li>点击“添加新行”按钮可以在表格末尾增加空白行。</li> -->
+                <!-- RED_MARK_END -->
                 <li><span class="highlight-red">点击“选择Excel文件”按钮上传你的 `.xlsx` 文件，第一列的讲座原文将自动加载并处理，替换当前表格内容。</span></li>
                 <!-- NEW_MARK_START -->
-                <li>在“修改文”和“英文”列中，Gemini AI 识别并修改的【佛教术语】将显示为<span class="highlight-diff">红色加粗</span>。</li>
-                <li>“修改文”和“英文”列的内容将自动按【连贯内涵的几句】分段显示。</li>
+                <li>在“修改文”和“英文”列中，Gemini AI 识别并修改的佛教术语将显示为<span class="highlight-diff">红色加粗</span>。</li>
+                <li>“修改文”和“英文”列的内容将自动按【句】分段显示。</li>
                 <!-- NEW_MARK_END -->
             </ol>
         </div>
@@ -351,8 +353,9 @@
                 // Prompt for single-line processing, explicitly requesting marking of changed Buddhist terms, and returning segmented arrays
                 const prompt = `以下是一段佛教讲座的语音转录，其中可能包含错别字和谐音字。请你：
 1. 纠正所有错别字和谐音字，使文本流畅、准确。
-2. 将纠正后的中文文本按**连贯内涵的几句**分段。每段落作为一个独立的字符串。
-3. 将纠正并分段后的中文文本翻译成英文。每个英文句段作为一个独立的字符串。
+2. 将纠正后的中文文本按**句**分段。每个句子作为一个独立的字符串。
+3. 将纠正并分段后的中文文本翻译成英文。每个英文句子作为一个独立的字符串，**对原文中对应的佛教术语使用双层方括号 \`[[]]\` 进行标记**。
+4. 在 'corrected_zh' 字段的每个句子中，对**原文中发生变化的佛教术语**使用双层方括号 \`[[]]\` 进行标记。例如：\`[[菩提]]\`。
 
 请以JSON对象的形式返回结果，包含 'corrected_zh'（纠正并分段后的中文句子数组）和 'en_translation'（英文翻译句子数组）两个字段。
 例如：
@@ -364,10 +367,10 @@ ${singleData}`;
                 try {
                     const geminiOutput = await callGeminiAPI(prompt); // Expect an object
                     // <!-- RED_MARK_START -->
-                    // Apply applyLLMHighlights function to corrected Chinese text, and join sentences with <br>
-                    processedResults[i][1] = applyLLMHighlights(geminiOutput.corrected_zh.join('<br>'));
-                    // Apply applyLLMHighlights to English sentences as well, and join with <br>
-                    processedResults[i][2] = applyLLMHighlights(geminiOutput.en_translation.join('<br>'));
+                    // Apply applyLLMHighlights function to corrected Chinese text, and join sentences with <br><br>
+                    processedResults[i][1] = applyLLMHighlights(geminiOutput.corrected_zh.join('<br><br>'));
+                    // Apply applyLLMHighlights to English sentences as well
+                    processedResults[i][2] = applyLLMHighlights(geminiOutput.en_translation.join('<br><br>'));
                     // <!-- RED_MARK_END -->
                 } catch (error) {
                     console.error(`处理行 ${i + 1} 时发生错误:`, error);
@@ -456,8 +459,8 @@ ${singleData}`;
             // Prompt for single-line processing, explicitly requesting marking of changed Buddhist terms, and returning segmented arrays
             const prompt = `以下是一段佛教讲座的语音转录，其中可能包含错别字和谐音字。请你：
 1. 纠正所有错别字和谐音字，使文本流畅、准确。
-2. 将纠正后的中文文本按**连贯内涵的几句**分段。每段落作为一个独立的字符串。
-3. 将纠正并分段后的中文文本翻译成英文。每个英文句段作为一个独立的字符串，**对原文中对应的佛教术语使用双层方括号 \`[[]]\` 进行标记**。
+2. 将纠正后的中文文本按**句**分段。每个句子作为一个独立的字符串。
+3. 将纠正并分段后的中文文本翻译成英文。每个英文句子作为一个独立的字符串，**对原文中对应的佛教术语使用双层方括号 \`[[]]\` 进行标记**。
 4. 在 'corrected_zh' 字段的每个句子中，对**原文中发生变化的佛教术语**使用双层方括号 \`[[]]\` 进行标记。例如：\`[[菩提]]\`。
 
 请以JSON对象的形式返回结果，包含 'corrected_zh'（纠正并分段后的中文句子数组）和 'en_translation'（英文翻译句子数组）两个字段。
@@ -470,10 +473,10 @@ ${singleData}`;
             try {
                 const geminiOutput = await callGeminiAPI(prompt); // Expect an object
                 // <!-- RED_MARK_START -->
-                // Apply applyLLMHighlights function to corrected Chinese text, and join sentences with <br>
-                processedResults[rowIndex][1] = applyLLMHighlights(geminiOutput.corrected_zh.join('<br>'));
-                // Apply applyLLMHighlights to English sentences as well, and join with <br>
-                processedResults[rowIndex][2] = applyLLMHighlights(geminiOutput.en_translation.join('<br>'));
+                // Apply applyLLMHighlights function to corrected Chinese text, and join sentences with <br><br>
+                processedResults[rowIndex][1] = applyLLMHighlights(geminiOutput.corrected_zh.join('<br><br>'));
+                // Apply applyLLMHighlights to English sentences as well
+                processedResults[rowIndex][2] = applyLLMHighlights(geminiOutput.en_translation.join('<br><br>'));
                 // <!-- RED_MARK_END -->
             } catch (error) {
                 console.error(`处理行 ${rowIndex + 1} 时发生错误:`, error);
@@ -535,9 +538,28 @@ ${singleData}`;
             });
         }
 
-        // <!-- RED_MARK_START -->
-        // addNewRow function is no longer needed as rows are added via scroll or initial load
-        // <!-- RED_MARK_END -->
+        /**
+         * 添加新行到表格
+         */
+        function addNewRow() {
+            // <!-- RED_MARK_START -->
+            // Add a single new empty row
+            const newRowData = ['', '', '']; // New row initialized as empty (Original, Corrected, English)
+            const newIndex = excelData.length;
+            excelData.push([newRowData[0]]); // Add to excelData (only store original)
+            processedResults.push(newRowData); // Add to processedResults
+
+            appendRowToDOM(newRowData, newIndex); // Directly append to DOM
+            // <!-- RED_MARK_END -->
+
+            statusMessage.textContent = `已添加新行。请在“原文”列输入内容。`;
+
+            // Scroll to the newly added row
+            const lastRow = resultsTableBody.lastElementChild;
+            if (lastRow) {
+                lastRow.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+        }
 
         // <!-- RED_MARK_START -->
         /**
